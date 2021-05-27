@@ -1,0 +1,145 @@
+-------------------------------------------------------------------------------
+--
+-- Title       : cn
+-- Design      : control memory
+-- Author      : AMIRREZA
+-- Company     : fpga
+--
+-------------------------------------------------------------------------------
+--
+-- File        : g:\My_Designs\control_memory\control memory\src\controlMemory.vhd
+-- Generated   : Sun Jan  1 17:33:08 2017
+-- From        : interface description file
+-- By          : Itf2Vhdl ver. 1.22
+--
+-------------------------------------------------------------------------------
+--
+-- Description : 
+--
+-------------------------------------------------------------------------------
+
+--{{ Section below this comment is automatically maintained
+--   and may be overwritten
+--{entity {cn} architecture {beh}}
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.all; 
+use ieee.std_logic_unsigned.all;
+use ieee.std_logic_arith.all;
+
+entity cn is
+	 port(
+		 clk : in STD_LOGIC;
+		 u : in STD_LOGIC;
+		 DR,AC : in STD_LOGIC_VECTOR(15 downto 0);
+		 f1 : out STD_LOGIC_VECTOR(2 downto 0);
+		 f2 : out STD_LOGIC_VECTOR(2 downto 0);
+		 f3 : out STD_LOGIC_VECTOR(2 downto 0);
+		 SBR : buffer STD_LOGIC_VECTOR(6 downto 0);
+		 CAR : buffer STD_LOGIC_VECTOR(6 downto 0)
+	     );
+end cn;
+
+--}} End of automatically maintained section
+
+architecture beh of cn is	  
+type ctrlmem is array (127 downto 0) of std_logic_vector(19 downto 0);
+signal cm :ctrlmem ;
+signal test,i,s,z : std_logic;
+signal v0,v1,v2,v3,mux_out,AD :std_logic_vector(6 downto 0);
+signal cm_out :std_logic_vector(19 downto 0);
+signal BR , CD ,sel : std_logic_vector(1 downto 0);
+
+begin
+	process(AC,DR)
+	begin
+	s <= AC(15);
+	i <= DR(15);
+	if(AC = "0000000000000000") then z <= '1';
+	else z <= '0'; 
+	end if;
+	cm(0) <= "00101001110000000001"; --	cd=s , br=00
+	cm(1) <= "00101001111000000010"; --cd=z , br=00		  
+	cm(2) <= "00101001110010000011"; --cd=s , br=01
+	cm(3) <= "00101001111010000100"; --cd=z , br=01
+	cm(4) <= "00101001110100000101";  --br=10
+	cm(5) <= "00101001110110000110"; --br=11
+	end process;
+	
+		process(CAR,clk)
+		begin  
+			if(clk' event and clk = '1') then
+			cm_out <= cm(conv_integer(CAR));
+			end if;
+		end process;  
+		
+		process(cm_out)
+		begin
+			f1 <= cm_out(19 downto 17);
+			f2 <= cm_out(16 downto 14);
+			f3 <= cm_out(13 downto 11);	 
+			CD <= cm_out(10 downto 9);
+			BR <= cm_out(8 downto 7);	
+			AD <= cm_out(6 downto 0); 
+		end process;
+		
+		process(clk)
+		begin	   
+			if (clk' event and clk='1') then
+			-- MUX1 :CONDITIONS: 
+			if (CD = "00") then test <= u;
+			elsif (CD = "01") then test <= i;
+			elsif (CD = "10") then test <= s;
+			else  test <= z; 
+			end if;
+			
+			 --STATUS BIT
+			 if(BR = "00" and  test='1' ) then
+				 v1 <= AD ;
+				 sel <= "01" ;
+				 elsif(BR = "00" and  test='0' ) then 
+					 v0 <= unsigned(CAR)+1; 
+				 	 sel <= "00";
+				
+			 		elsif(BR = "01" and  test='1' ) then 
+				 		v1 <= AD ;
+				 		SBR <= unsigned(CAR)+1 ;
+					    sel <= "01" ;
+					    elsif(BR = "01" and  test='0' ) then 
+							 v0 <= unsigned(CAR)+1;
+							 sel <= "00";
+								
+							 elsif(BR = "10" ) then 
+								 v2 <= SBR;
+								 sel <= "10" ;
+								
+								 elsif(BR = "11" ) then  
+									 v3(5 downto 2) <= DR(14 downto 11);
+									 v3(0) <= '0';	
+									 v3(1) <= '0'; 
+									 v3(6) <= '0';
+									 sel <= "11" ;
+			end if;	
+			end if;
+			--MAIN MUX
+			end process;
+			
+			process(sel)
+			begin
+			if(sel = "00")then mux_out <= v0; 
+			elsif(sel = "01")then mux_out <= v1;
+			elsif(sel = "10")then mux_out <= v2;
+			elsif(sel = "11")then mux_out <= v3;  
+				end if;
+					
+		end process;
+		
+		process(clk)
+		begin 
+			if(clk' event and clk ='1') then
+			CAR <= mux_out;	
+			end if;
+		end process;
+		
+
+end beh;
